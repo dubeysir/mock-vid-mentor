@@ -1,0 +1,8 @@
+
+{
+    "uris": [
+        "face_expression_model-weights_manifest.json",
+        "face_expression_model-shard1"
+    ],
+    "weightMapUrl": "face_expression_model-shard1"
+}
