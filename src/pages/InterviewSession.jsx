@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -20,13 +19,11 @@ const InterviewSession = () => {
   const [stream, setStream] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [countdown, setCountdown] = useState(null);
-  const [timeRemaining, setTimeRemaining] = useState(60); // 60 seconds per question
   const [faceExpressions, setFaceExpressions] = useState([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [facialRecognitionEnabled, setFacialRecognitionEnabled] = useState(true);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
-  const timerRef = useRef(null);
   const expressionIntervalRef = useRef(null);
   
   // Find selected role from jobRoles data
@@ -198,22 +195,6 @@ const InterviewSession = () => {
           
           mediaRecorder.start();
           setCountdown(null);
-          
-          // Set timer for question
-          setTimeRemaining(60);
-          timerRef.current = setInterval(() => {
-            setTimeRemaining(prev => {
-              if (prev <= 1) {
-                clearInterval(timerRef.current);
-                if (mediaRecorder && mediaRecorder.state === 'recording') {
-                  mediaRecorder.stop();
-                }
-                setRecording(false);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
         }
       }, 1000);
     }
@@ -223,24 +204,25 @@ const InterviewSession = () => {
     if (mediaRecorder && recording && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
       setRecording(false);
-      clearInterval(timerRef.current);
     }
   };
   
   const skipQuestion = () => {
-    if (recording) {
-      stopRecording();
-    }
-    
+    // Continue recording if already recording
     if (currentQuestionIndex < role.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setTimeRemaining(60);
-    } else {
-      // End of interview
-      navigate('/dashboard');
+      
       toast({
-        title: "Interview Completed",
-        description: "You've completed all the questions for this role!",
+        title: "Question Changed",
+        description: "Moved to the next question. Recording will continue until you stop it manually.",
+        variant: "default"
+      });
+    } else {
+      // End of questions but don't stop recording
+      toast({
+        title: "Last Question",
+        description: "This is the last question. You can stop recording when you're ready.",
+        variant: "default"
       });
     }
   };
@@ -386,7 +368,7 @@ const InterviewSession = () => {
               {recording && (
                 <div className="recording-indicator">
                   <div className="recording-dot animate-pulse"></div>
-                  <span>Recording • {timeRemaining}s</span>
+                  <span>Recording</span>
                 </div>
               )}
             </div>
@@ -402,7 +384,7 @@ const InterviewSession = () => {
                 </Button>
               )}
               <Button onClick={skipQuestion} variant="outline" size="lg">
-                <SkipForward className="mr-2 h-5 w-5" /> Skip Question
+                <SkipForward className="mr-2 h-5 w-5" /> Next Question
               </Button>
             </div>
           </div>
