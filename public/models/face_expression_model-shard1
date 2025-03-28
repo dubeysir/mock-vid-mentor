@@ -1,0 +1,2 @@
+
+This file will contain binary data for the face expression model. In a real application, you would download this from the official face-api.js repository. For now, we'll implement a fallback mechanism that doesn't rely on the facial recognition models.

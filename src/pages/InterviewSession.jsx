@@ -23,6 +23,7 @@ const InterviewSession = () => {
   const [timeRemaining, setTimeRemaining] = useState(60); // 60 seconds per question
   const [faceExpressions, setFaceExpressions] = useState([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [facialRecognitionEnabled, setFacialRecognitionEnabled] = useState(true);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const timerRef = useRef(null);
@@ -56,10 +57,12 @@ const InterviewSession = () => {
         console.log('Face API models loaded');
       } catch (error) {
         console.error('Error loading models:', error);
+        setFacialRecognitionEnabled(false);
+        setModelsLoaded(true); // Still mark as loaded even though we're disabling the feature
         toast({
-          title: "Error loading facial recognition",
-          description: "Please check your internet connection and try again",
-          variant: "destructive"
+          title: "Facial recognition unavailable",
+          description: "We'll continue without expression analysis",
+          variant: "default"
         });
       }
     };
@@ -91,7 +94,7 @@ const InterviewSession = () => {
           
           // Set up face detection once video is playing
           videoRef.current.onplay = () => {
-            if (canvasRef.current && modelsLoaded) {
+            if (canvasRef.current && modelsLoaded && facialRecognitionEnabled) {
               const displaySize = { 
                 width: videoRef.current.videoWidth, 
                 height: videoRef.current.videoHeight 
@@ -105,18 +108,27 @@ const InterviewSession = () => {
               
               expressionIntervalRef.current = setInterval(async () => {
                 if (videoRef.current && canvasRef.current) {
-                  const detections = await faceapi
-                    .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-                    .withFaceExpressions();
-                  
-                  if (detections && detections[0] && detections[0].expressions) {
-                    setFaceExpressions(prev => [...prev, detections[0].expressions]);
+                  try {
+                    const detections = await faceapi
+                      .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+                      .withFaceExpressions();
                     
-                    // Draw detections and expressions
-                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
-                    canvasRef.current.getContext('2d').clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-                    faceapi.draw.drawDetections(canvasRef.current, resizedDetections);
-                    faceapi.draw.drawFaceExpressions(canvasRef.current, resizedDetections);
+                    if (detections && detections[0] && detections[0].expressions) {
+                      setFaceExpressions(prev => [...prev, detections[0].expressions]);
+                      
+                      // Draw detections and expressions
+                      const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                      canvasRef.current.getContext('2d').clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                      faceapi.draw.drawDetections(canvasRef.current, resizedDetections);
+                      faceapi.draw.drawFaceExpressions(canvasRef.current, resizedDetections);
+                    }
+                  } catch (error) {
+                    console.error('Face detection error:', error);
+                    // If we encounter an error during detection, disable the feature
+                    if (expressionIntervalRef.current) {
+                      clearInterval(expressionIntervalRef.current);
+                    }
+                    setFacialRecognitionEnabled(false);
                   }
                 }
               }, 500);
@@ -146,7 +158,7 @@ const InterviewSession = () => {
         clearInterval(expressionIntervalRef.current);
       }
     };
-  }, [modelsLoaded, toast]);
+  }, [modelsLoaded, toast, facialRecognitionEnabled]);
   
   const startRecording = () => {
     if (mediaRecorder && !recording) {
@@ -235,13 +247,13 @@ const InterviewSession = () => {
   
   // Analyze facial expressions to give feedback
   const analyzeExpressions = (expressions) => {
-    if (!expressions || expressions.length === 0) {
+    if (!facialRecognitionEnabled || !expressions || expressions.length === 0) {
       return {
         confidence: 'medium',
-        smile: 'low',
-        neutral: 'high',
-        summary: 'We couldn\'t detect enough facial expressions to provide a complete analysis.',
-        tips: ['Make sure your face is clearly visible', 'Try to face the camera directly']
+        smile: 'medium',
+        neutral: 'medium',
+        summary: 'Facial expression analysis was not available for this recording.',
+        tips: ['Ensure your face is clearly visible', 'Try to face the camera directly', 'Practice with confident expressions']
       };
     }
     
@@ -296,6 +308,10 @@ const InterviewSession = () => {
   };
   
   const generateSummary = (expressionData) => {
+    if (!facialRecognitionEnabled) {
+      return "Facial expression analysis was not available for this recording.";
+    }
+    
     if (expressionData.neutral > 0.7) {
       return "You appeared quite neutral throughout your answer, which might be perceived as lack of enthusiasm.";
     } else if (expressionData.happy > 0.3) {
